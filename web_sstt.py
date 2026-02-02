@@ -16,7 +16,7 @@ import logging      # Para imprimir logs
 
 
 BUFSIZE = 8192 # Tamaño máximo del buffer que se puede utilizar
-TIMEOUT_CONNECTION = 20 # Timout para la conexión persistente
+TIMEOUT_CONNECTION = 20 # Timeout para la conexión persistente
 MAX_ACCESOS = 10
 
 # Extensiones admitidas (extension, name in HTTP)
@@ -34,20 +34,20 @@ def enviar_mensaje(cs, data):
     """ Esta función envía datos (data) a través del socket cs
         Devuelve el número de bytes enviados.
     """
-    pass
+    return cs.send(data)
 
 
 def recibir_mensaje(cs):
     """ Esta función recibe datos a través del socket cs
         Leemos la información que nos llega. recv() devuelve un string con los datos.
     """
-    pass
+    return cs.recv(BUFSIZE)
 
 
 def cerrar_conexion(cs):
     """ Esta función cierra una conexión activa.
     """
-    pass
+    cs.close()
 
 
 def process_cookies(headers,  cs):
@@ -58,7 +58,21 @@ def process_cookies(headers,  cs):
         4. Si se encuentra y tiene el valor MAX_ACCESSOS se devuelve MAX_ACCESOS
         5. Si se encuentra y tiene un valor 1 <= x < MAX_ACCESOS se incrementa en 1 y se devuelve el valor
     """
-    pass
+    for header in headers:
+        if header.startswith("Cookie:"):
+            cookies = split(":")
+            for cookie in cookies:
+                cookie = cookie.strip()
+                if cookie.startswith("cookie_counter="):
+                    try:
+                        value = int(cookie[len("cookie_counter="):])
+                        if value == MAX_ACCESOS:
+                            return MAX_ACCESOS
+                        else:
+                            return value + 1
+                    except ValueError:
+                        return 1
+    
 
 
 def process_web_request(cs, webroot):
@@ -96,7 +110,18 @@ def process_web_request(cs, webroot):
             * Si es por timeout, se cierra el socket tras el período de persistencia.
                 * NOTA: Si hay algún error, enviar una respuesta de error con una pequeña página HTML que informe del error.
     """
+    rlist = [cs]
+    rsublist = select.select(rlist,[],[],TIMEOUT_CONNECTION)
+    if not rsublist():
+        logger.info("Closing connection due to timeout.")
+        cerrar_conexion(cs)
+        return
+    else:
+        data = recibir_mensaje(cs)
+        
 
+
+        
 
 def main():
     """ Función principal del servidor
