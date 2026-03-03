@@ -58,22 +58,19 @@ def process_cookies(headers,  cs):
         4. Si se encuentra y tiene el valor MAX_ACCESSOS se devuelve MAX_ACCESOS
         5. Si se encuentra y tiene un valor 1 <= x < MAX_ACCESOS se incrementa en 1 y se devuelve el valor
     """
+
     for header in headers:
         if header.startswith("Cookie:"):
-            cookies = split(":")
-            for cookie in cookies:
-                cookie = cookie.strip()
-                if cookie.startswith("cookie_counter="):
-                    try:
-                        value = int(cookie[len("cookie_counter="):])
-                        if value == MAX_ACCESOS:
-                            return MAX_ACCESOS
-                        else:
-                            return value + 1
-                    except ValueError:
-                        return 1
-    
-
+            cookie_value = header.split(":",1)[1].strip()
+            cookie_counter = re.search(r"cookie_counter=([^;]+)", cookie_value)
+            if cookie_counter:
+                cookie_counter_value = cookie_counter.group(1)
+                if cookie_counter == MAX_ACCESOS:
+                    return MAX_ACCESOS
+                elif cookie_counter_value >= 1 and cookie_counter_value < MAX_ACCESOS:
+                    return cookie_counter + 1
+            else:
+                return 1                
 
 def process_web_request(cs, webroot):
     """ Procesamiento principal de los mensajes recibidos.
@@ -162,15 +159,18 @@ def main():
             - Si es el proceso padre cerrar el socket que gestiona el hijo.
         """
 
-        s = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0)
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        s.bind((args.host, args.port))
-        s.listen()
+        s = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0) # Creamos socket TCP
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Permitimos reusar la misma dirección previamente vinculada a otro proceso
+        s.bind((args.ip, args.port)) # Vinculamos el socket a una IP y puerto elegidos
+        s.listen() # Escuchamos conexiones entrantes
+        
         while True:
-            conn, addr = s.accept()
-            pid = os.fork()
-            if pid == 0:
-                s.close()
+            
+            conn, addr = s.accept() # conn: socket que se usará para recibir datos del cliente en esta nueva conexión
+                                    # addr: es la dirección del cliente que se ha conectado
+            pid = os.fork() # Creamos un proceso hijo que se encargará de procesar la petición del cliente
+            if pid == 0: # fork devuelve 0 en el proceso hijo
+                s.close() 
                 process_web_request(conn, args.webroot)
                 sys.exit(0)
             else:
