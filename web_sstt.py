@@ -16,7 +16,7 @@ import logging      # Para imprimir logs
 
 
 BUFSIZE = 8192 # Tamaño máximo del buffer que se puede utilizar
-TIMEOUT_CONNECTION = 20 # Timeout para la conexión persistente
+TIMEOUT_CONNECTION = 20 # Timout para la conexión persistente
 MAX_ACCESOS = 10
 
 # Extensiones admitidas (extension, name in HTTP)
@@ -34,20 +34,21 @@ def enviar_mensaje(cs, data):
     """ Esta función envía datos (data) a través del socket cs
         Devuelve el número de bytes enviados.
     """
-    return cs.send(data)
+    return cs.send(data.encode())
 
 
 def recibir_mensaje(cs):
     """ Esta función recibe datos a través del socket cs
         Leemos la información que nos llega. recv() devuelve un string con los datos.
     """
-    return cs.recv(BUFSIZE)
+    return cs.recv(BUFSIZE).decode()
+
 
 
 def cerrar_conexion(cs):
     """ Esta función cierra una conexión activa.
     """
-    cs.close()
+    cs.close(); 
 
 
 def process_cookies(headers,  cs):
@@ -58,19 +59,19 @@ def process_cookies(headers,  cs):
         4. Si se encuentra y tiene el valor MAX_ACCESSOS se devuelve MAX_ACCESOS
         5. Si se encuentra y tiene un valor 1 <= x < MAX_ACCESOS se incrementa en 1 y se devuelve el valor
     """
-
-    for header in headers:
-        if header.startswith("Cookie:"):
-            cookie_value = header.split(":",1)[1].strip()
-            cookie_counter = re.search(r"cookie_counter=([^;]+)", cookie_value)
-            if cookie_counter:
-                cookie_counter_value = cookie_counter.group(1)
-                if cookie_counter == MAX_ACCESOS:
-                    return MAX_ACCESOS
-                elif cookie_counter_value >= 1 and cookie_counter_value < MAX_ACCESOS:
-                    return cookie_counter + 1
+    cookie_value = headers.split(": ")[1].split("; ")
+    for cookie in cookie_value:
+        if re.fullmatch(r'cookie_counter=(\d+)', cookie.strip()):
+            cookie_counter = int(cookie.split("=")[1])
+            if cookie_counter == MAX_ACCESOS:
+                return MAX_ACCESOS
             else:
-                return 1                
+                return cookie_counter + 1
+    return 1
+
+
+
+
 
 def process_web_request(cs, webroot):
     """ Procesamiento principal de los mensajes recibidos.
@@ -107,23 +108,65 @@ def process_web_request(cs, webroot):
             * Si es por timeout, se cierra el socket tras el período de persistencia.
                 * NOTA: Si hay algún error, enviar una respuesta de error con una pequeña página HTML que informe del error.
     """
-    rlist = [cs]
-    rsublist = select.select(rlist,[],[],TIMEOUT_CONNECTION)
-    if not rsublist():
-        logger.info("Closing connection due to timeout.")
-        cerrar_conexion(cs)
-        return
-    else:
-        data = recibir_mensaje(cs)
-        
+    while True:
+        rlist = [cs]
+        rsublist, _, _ = select.select(rlist,[],[],TIMEOUT_CONNECTION)
+        if rsublist:
+
+            data = recibir_mensaje(cs).split("\r\n")
+            linea_solicitud = data[0]
+            cabeceras = data[1:]
+
+            if len(linea_solicitud.split()) != 3:
+                return "400 Bad Request" #Devolver archivo html, por ahora solo texto
+            
+            cabeceras = data[1:]
+            metodo = linea_solicitud.split()[0]
+            url = linea_solicitud.split()[1]
+            version = linea_solicitud.split()[2]
+
+            if version != "HTTP/1.1":
+                return "400 Bad Request" #Devolver archivo html, por ahora solo texto
+            
+            if metodo not in ['GET', 'POST']:
+                return "405 Method Not Allowed"
+            
+            url = url.split("?")[0]
+            if url == "/":
+                url = "/index.html"
+            ruta = webroot+url
+
+            if not os.path.isfile(ruta):
+                return "404 Not found" #Devolver archivo html, por ahora solo texto
+            
+            for cabecera in cabeceras:
+                if cabecera != "":
+                    nombre, valor = cabecera.split(": ")
+                    print(nombre, valor) # Terminar
+                    if nombre == "Cookie":
+                        cookie_counter = process_cookies(cabecera, cs)
+                        if cookie_counter == MAX_ACCESOS:
+                            return "403 Forbidden"
+
+                    
+            
+            tamano = os.stat(ruta).st_size
+            extension = ruta.split(".")[-1]
+            tipo = filetypes.get(extension)
+            fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+
+            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nSet-Cookie: cookie_counter={cookie_counter}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
 
 
-        
+        # terminar
+            
+        else:
+            cerrar_conexion(cs)  
 
 def main():
     """ Función principal del servidor
     """
-
+    
     try:
 
         # Argument parser para obtener la ip y puerto de los parámetros de ejecución del programa. IP por defecto 0.0.0.0
@@ -158,24 +201,18 @@ def main():
 
             - Si es el proceso padre cerrar el socket que gestiona el hijo.
         """
-
-        s = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0) # Creamos socket TCP
-        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # Permitimos reusar la misma dirección previamente vinculada a otro proceso
-        s.bind((args.ip, args.port)) # Vinculamos el socket a una IP y puerto elegidos
-        s.listen() # Escuchamos conexiones entrantes
-        
+        cs = socket.socket(socket.AF_INET,socket.SOCK_STREAM,0)
+        cs.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        cs.bind((args.host, args.port))
+        cs.listen(64)
         while True:
-            
-            conn, addr = s.accept() # conn: socket que se usará para recibir datos del cliente en esta nueva conexión
-                                    # addr: es la dirección del cliente que se ha conectado
-            pid = os.fork() # Creamos un proceso hijo que se encargará de procesar la petición del cliente
-            if pid == 0: # fork devuelve 0 en el proceso hijo
-                s.close() 
+            conn,addr = cs.accept()
+            pid = os.fork()
+            if pid == 0:
+                cerrar_conexion(cs)
                 process_web_request(conn, args.webroot)
-                sys.exit(0)
             else:
-                conn.close()
-
+                cerrar_conexion(conn)
 
     except KeyboardInterrupt:
         True
