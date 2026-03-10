@@ -13,10 +13,10 @@ import sys          # sys.exit
 import re           # Analizador sintáctico
 import logging      # Para imprimir logs
 
-
+#serviciostelematicos9448.com
 
 BUFSIZE = 8192 # Tamaño máximo del buffer que se puede utilizar
-TIMEOUT_CONNECTION = 20 # Timout para la conexión persistente
+TIMEOUT_CONNECTION = 35 #10+9+4+4+8 # Timout para la conexión persistente
 MAX_ACCESOS = 10
 
 # Extensiones admitidas (extension, name in HTTP)
@@ -59,10 +59,10 @@ def process_cookies(headers,  cs):
         4. Si se encuentra y tiene el valor MAX_ACCESSOS se devuelve MAX_ACCESOS
         5. Si se encuentra y tiene un valor 1 <= x < MAX_ACCESOS se incrementa en 1 y se devuelve el valor
     """
-    cookie_value = headers.split(": ")[1].split("; ")
-    for cookie in cookie_value:
-        if re.fullmatch(r'cookie_counter=(\d+)', cookie.strip()):
-            cookie_counter = int(cookie.split("=")[1])
+    for cabecera in headers:
+        nombre = cabecera.split(": ")[0]
+        if nombre == "Cookie":
+            cookie_counter = int(cabecera.split("=")[1])
             if cookie_counter == MAX_ACCESOS:
                 return MAX_ACCESOS
             else:
@@ -112,56 +112,92 @@ def process_web_request(cs, webroot):
         rlist = [cs]
         rsublist, _, _ = select.select(rlist,[],[],TIMEOUT_CONNECTION)
         if rsublist:
-
             data = recibir_mensaje(cs).split("\r\n")
             linea_solicitud = data[0]
             cabeceras = data[1:]
 
-            if len(linea_solicitud.split()) != 3:
-                return "400 Bad Request" #Devolver archivo html, por ahora solo texto
-            
-            cabeceras = data[1:]
-            metodo = linea_solicitud.split()[0]
-            url = linea_solicitud.split()[1]
-            version = linea_solicitud.split()[2]
+            if len(linea_solicitud.split()) == 3:
+                metodo = linea_solicitud.split()[0]
+                url = linea_solicitud.split()[1]
+                version = linea_solicitud.split()[2]
+                if version == "HTTP/1.1":
+                    if metodo in ['GET', 'POST']:
+                        recurso, _, parametros = url.partition("?")
+                        if recurso == "/":
+                            recurso = "/index.html"
+                        for par in parametros.split("&"):
+                            nombre, _, valor = par.partition("=")
+                            if nombre == "email":
+                                dominio = valor.split("%40")[-1]
+                                if dominio == "um.es":
+                                    recurso = "/EmailCorrecto.html"
+                                else:
+                                    recurso = "/EmailIncorrecto.html" 
+                        ruta = webroot+recurso
+                        if os.path.isfile(ruta):
+                            if process_host(cabeceras):
+                                codigo = "200"
+                                tamano = os.stat(ruta).st_size
+                                tipo = filetypes.get(ruta.split(".")[-1])
+                                fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
+                                if url == "/index.html":
+                                    cookie_counter = process_cookies(cabeceras, cs)
+                                    if cookie_counter != MAX_ACCESOS:
+                                        condicion = True
+                                    else:    
+                                        codigo = "403 Forbidden"
+                                else:
+                                    cookie_counter = None
+                                    condicion = False  
+                            else: 
+                                codigo = "400 Bad Request"   
+                        else:
+                            codigo = "404 Not Found"
+                    else:
+                        codigo = "405 Method Not Allowed"
+                else:
+                    codigo = "505 HTTP Version Not Supported"   
+            else:
+                codigo = "400 Bad Request"
 
-            if version != "HTTP/1.1":
-                return "400 Bad Request" #Devolver archivo html, por ahora solo texto
-            
-            if metodo not in ['GET', 'POST']:
-                return "405 Method Not Allowed"
-            
-            url = url.split("?")[0]
-            if url == "/":
-                url = "/index.html"
-            ruta = webroot+url
-
-            if not os.path.isfile(ruta):
-                return "404 Not found" #Devolver archivo html, por ahora solo texto
-            
-            for cabecera in cabeceras:
-                if cabecera != "":
-                    nombre, valor = cabecera.split(": ")
-                    print(nombre, valor) # Terminar
-                    if nombre == "Cookie":
-                        cookie_counter = process_cookies(cabecera, cs)
-                        if cookie_counter == MAX_ACCESOS:
-                            return "403 Forbidden"
-
-                    
-            
-            tamano = os.stat(ruta).st_size
-            extension = ruta.split(".")[-1]
-            tipo = filetypes.get(extension)
-            fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-
-            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nSet-Cookie: cookie_counter={cookie_counter}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
-
-
-        # terminar
-            
+            if codigo == "200":
+                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, cookie_counter, condicion))
+                with open(ruta, "rb") as f:
+                    while True:
+                        bloque = f.read(BUFSIZE)
+                        if not bloque:
+                            break
+                        cs.send(bloque)
+            else:
+                codigo = codigo.split()[0]
+                with open(codigo + ".html", "rb") as f:
+                        cuerpo = f.read()
+                        tamano = len(cuerpo)
+                        tipo= "text/html"
+                        enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, None, False))
+                        cs.send(cuerpo)
         else:
-            cerrar_conexion(cs)  
+            cerrar_conexion(cs)
+            return None
+            # Termino por TimeOut
+
+
+def mensaje(codigo, tipo, tamano, fecha, cookie, condicion):
+    if codigo == "200":
+        if condicion:
+            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nSet-Cookie: cookie_counter_9448={cookie}; Max-Age=30\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+        else:
+            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+    else:
+        respuesta = f"HTTP/1.1 {codigo}\r\nConnection: close\r\nDate: {fecha}\r\nServer: web_sstt\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+    return respuesta
+
+def process_host(headers):
+    for cabecera in headers:
+        nombre = cabecera.split(": ")[0]
+        if nombre == "Host":
+            return True
+    return False
 
 def main():
     """ Función principal del servidor
