@@ -1,0 +1,10 @@
+Servidor (192.168.56.101):
+- /etc/bind/named.conf.options
+- /etc/bind/named.conf.local
+- /etc/bind/db.nombreorganizacion9448.org.zone
+- /etc/resolvconf/resolv.conf.d/head
+
+Cliente (192.168.56.102):
+- /etc/bind/named.conf.options
+- /etc/bind/named.conf.local
+- /etc/resolvconf/resolv.conf.d/head

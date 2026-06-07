@@ -1,0 +1,24 @@
+;
+; BIND data file for local loopback interface
+;
+$TTL    604800
+$ORIGIN nombreorganizacion9448.org.
+@   IN  SOA servidor.nombreorganizacion9448.org. admin.nombreorganizacion9448.org. (
+                  2         ; Serial
+             604800         ; Refresh
+              86400         ; Retry
+            2419200         ; Expire
+             604800 )       ; Negative Cache TTL
+;
+@       IN  NS  servidor.nombreorganizacion9448.org.
+@       IN  NS  cliente.nombreorganizacion9448.org.
+@       IN  MX  10  smtp.nombreorganizacion9448.org.
+
+servidor    IN  A   192.168.56.101
+cliente     IN  A   192.168.56.102
+dns1        IN  A   192.168.56.101
+dns2        IN  A   192.168.56.102
+www         IN  A   192.168.56.101
+web         IN  A   192.168.56.101
+smtp        IN  A   192.168.56.101
+pop         IN  A   192.168.56.101

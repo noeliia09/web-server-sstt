@@ -1,0 +1,14 @@
+root@Ubuntu-server-16-04-SSTT:/home/vboxuser# cat /etc/bind/named.conf.local   
+//
+// Do any local configuration here
+//
+
+// Consider adding the 1918 zones here, if they are not used in your
+// organization
+//include "/etc/bind/zones.rfc1918";
+
+zone "nombreorganizacion9448.org" {
+	type master;
+	file "/etc/bind/db.nombreorganizacion9448.org.zone";
+	allow-transfer { 192.168.56.102; };
+};

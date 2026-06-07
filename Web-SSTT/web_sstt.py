@@ -190,11 +190,11 @@ def process_web_request(cs, webroot):
 def mensaje(codigo, tipo, tamano, fecha, cookie, condicion):
     if codigo == "200":
         if condicion:
-            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nSet-Cookie: cookie_counter_9448={cookie}; Max-Age=30\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nSet-Cookie: cookie_counter_9448={cookie}; Max-Age=30\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
         else:
-            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web_sstt\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
     else:
-        respuesta = f"HTTP/1.1 {codigo}\r\nConnection: close\r\nDate: {fecha}\r\nServer: web_sstt\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+        respuesta = f"HTTP/1.1 {codigo}\r\nConnection: close\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
     return respuesta
 
 def process_host(headers):
