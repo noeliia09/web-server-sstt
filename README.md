@@ -1,4 +1,6 @@
+# Le puedes hacer un rename al repo como Proyecto-SSTT ?
 # Proyecto de Servicios Telemáticos
+
 ## Workflow paso a paso:
 
 1. Editar código en mi PC
@@ -8,3 +10,5 @@
 	git push
 3. Enviar a VM para probar:
 	scp web_sstt.py alumno@192.168.56.101:/home/alumno/
+
+

@@ -16,7 +16,7 @@ import logging      # Para imprimir logs
 #serviciostelematicos9448.com
 
 BUFSIZE = 8192 # Tamaño máximo del buffer que se puede utilizar
-TIMEOUT_CONNECTION = 35 #10+9+4+4+8 # Timout para la conexión persistente
+TIMEOUT_CONNECTION = 35 #9+4+4+8+10# Timout para la conexión persistente
 MAX_ACCESOS = 10
 
 # Extensiones admitidas (extension, name in HTTP)
@@ -112,6 +112,7 @@ def process_web_request(cs, webroot):
         rlist = [cs]
         rsublist, _, _ = select.select(rlist,[],[],TIMEOUT_CONNECTION)
         if rsublist:
+            fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
             data = recibir_mensaje(cs).split("\r\n")
             linea_solicitud = data[0]
             cabeceras = data[1:]
@@ -124,23 +125,23 @@ def process_web_request(cs, webroot):
                     if metodo in ['GET', 'POST']:
                         recurso, _, parametros = url.partition("?")
                         if recurso == "/":
-                            recurso = "/index.html"
-                        for par in parametros.split("&"):
-                            nombre, _, valor = par.partition("=")
-                            if nombre == "email":
-                                dominio = valor.split("%40")[-1]
-                                if dominio == "um.es":
-                                    recurso = "/EmailCorrecto.html"
-                                else:
-                                    recurso = "/EmailIncorrecto.html" 
+                            recurso = "/src/index.html"
+                        if parametros:
+                            for par in parametros.split("&"):
+                                nombre, _, valor = par.partition("=")
+                                if nombre == "email":
+                                    dominio = valor.split("%40")[-1]
+                                    if dominio == "um.es":
+                                        recurso = "/src/EmailCorrecto.html"
+                                    else:
+                                        recurso = "/src/EmailIncorrecto.html" 
                         ruta = webroot+recurso
                         if os.path.isfile(ruta):
                             if process_host(cabeceras):
                                 codigo = "200"
                                 tamano = os.stat(ruta).st_size
                                 tipo = filetypes.get(ruta.split(".")[-1])
-                                fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-                                if url == "/index.html":
+                                if recurso == "/src/index.html":
                                     cookie_counter = process_cookies(cabeceras, cs)
                                     if cookie_counter != MAX_ACCESOS:
                                         condicion = True
@@ -170,12 +171,16 @@ def process_web_request(cs, webroot):
                         cs.send(bloque)
             else:
                 codigo = codigo.split()[0]
-                with open(codigo + ".html", "rb") as f:
-                        cuerpo = f.read()
-                        tamano = len(cuerpo)
-                        tipo= "text/html"
-                        enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, None, False))
-                        cs.send(cuerpo)
+                ruta_error = os.path.join(webroot, "src", codigo + ".html")
+                try:
+                    with open(ruta_error, "rb") as f: 
+                            cuerpo = f.read()
+                except FileNotFoundError:
+                 cuerpo = f"<html><body><h1>{codigo}</h1></body></html>".encode()
+                tamano = len(cuerpo)
+                tipo= "text/html"
+                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, None, False))
+                cs.send(cuerpo)
         else:
             cerrar_conexion(cs)
             return None
