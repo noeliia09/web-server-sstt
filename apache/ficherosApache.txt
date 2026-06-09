@@ -1,0 +1,6 @@
+Servidor:
+- /etc/apache2/sites-available/nombreorganizacion9448.conf
+- /var/www/nombreorganizacion9448/index.html
+- /var/www/nombreorganizacion9448/logo-um.jpg
+- /etc/apache2/groups
+- /home/vboxuser/demoCA
