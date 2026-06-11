@@ -125,23 +125,23 @@ def process_web_request(cs, webroot):
                     if metodo in ['GET', 'POST']:
                         recurso, _, parametros = url.partition("?")
                         if recurso == "/":
-                            recurso = "/src/index.html"
+                            recurso = "/index.html"
                         if parametros:
                             for par in parametros.split("&"):
                                 nombre, _, valor = par.partition("=")
                                 if nombre == "email":
                                     dominio = valor.split("%40")[-1]
                                     if dominio == "um.es":
-                                        recurso = "/src/EmailCorrecto.html"
+                                        recurso = "/EmailCorrecto.html"
                                     else:
-                                        recurso = "/src/EmailIncorrecto.html" 
+                                        recurso = "/EmailIncorrecto.html" 
                         ruta = webroot+recurso
                         if os.path.isfile(ruta):
                             if process_host(cabeceras):
                                 codigo = "200"
                                 tamano = os.stat(ruta).st_size
                                 tipo = filetypes.get(ruta.split(".")[-1])
-                                if recurso == "/src/index.html":
+                                if recurso == "/index.html":
                                     cookie_counter = process_cookies(cabeceras, cs)
                                     if cookie_counter != MAX_ACCESOS:
                                         condicion = True
@@ -171,7 +171,7 @@ def process_web_request(cs, webroot):
                         cs.send(bloque)
             else:
                 codigo = codigo.split()[0]
-                ruta_error = os.path.join(webroot, "src", codigo + ".html")
+                ruta_error = os.path.join(webroot, codigo + ".html")
                 try:
                     with open(ruta_error, "rb") as f: 
                             cuerpo = f.read()
