@@ -112,8 +112,14 @@ def process_web_request(cs, webroot):
         rlist = [cs]
         rsublist, _, _ = select.select(rlist,[],[],TIMEOUT_CONNECTION)
         if rsublist:
+            data = recibir_mensaje(cs)
+            if not data:
+                cerrar_conexion(cs)
+                logger.info("Cliente cerro la conexión.\n")
+                return None
+            print(data) 
+            data = data.split("\r\n")
             fecha = datetime.utcnow().strftime('%a, %d %b %Y %H:%M:%S GMT')
-            data = recibir_mensaje(cs).split("\r\n")
             linea_solicitud = data[0]
             cabeceras = data[1:]
 
@@ -130,30 +136,27 @@ def process_web_request(cs, webroot):
                             for par in parametros.split("&"):
                                 nombre, _, valor = par.partition("=")
                                 if nombre == "email":
-                                    dominio = valor.split("%40")[-1]
-                                    if dominio == "um.es":
+                                    email = valor.replace("%40", "@")
+                                    if email in ["fatima_94@nombreorganizacion9448.org", "noelia_48@nombreorganizacion9448.org"]:
                                         recurso = "/EmailCorrecto.html"
                                     else:
                                         recurso = "/EmailIncorrecto.html" 
                         ruta = webroot+recurso
-                        if os.path.isfile(ruta):
-                            if process_host(cabeceras):
-                                codigo = "200"
-                                tamano = os.stat(ruta).st_size
-                                tipo = filetypes.get(ruta.split(".")[-1])
-                                if recurso == "/index.html":
-                                    cookie_counter = process_cookies(cabeceras, cs)
-                                    if cookie_counter != MAX_ACCESOS:
-                                        condicion = True
-                                    else:    
-                                        codigo = "403 Forbidden"
-                                else:
-                                    cookie_counter = None
-                                    condicion = False  
-                            else: 
+                        if process_host(cabeceras):
+                            if os.path.isfile(ruta):
+                                    codigo = "200"
+                                    tamano = os.stat(ruta).st_size
+                                    tipo = filetypes.get(ruta.split(".")[-1])
+                                    if recurso == "/index.html":
+                                        cookie_counter = process_cookies(cabeceras, cs)
+                                        if cookie_counter == MAX_ACCESOS:
+                                            codigo = "403 Forbidden"
+                                    else:
+                                        cookie_counter = None
+                            else:
+                                codigo = "404 Not Found"
+                        else: 
                                 codigo = "400 Bad Request"   
-                        else:
-                            codigo = "404 Not Found"
                     else:
                         codigo = "405 Method Not Allowed"
                 else:
@@ -162,7 +165,7 @@ def process_web_request(cs, webroot):
                 codigo = "400 Bad Request"
 
             if codigo == "200":
-                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, cookie_counter, condicion))
+                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, cookie_counter))
                 with open(ruta, "rb") as f:
                     while True:
                         bloque = f.read(BUFSIZE)
@@ -176,25 +179,26 @@ def process_web_request(cs, webroot):
                     with open(ruta_error, "rb") as f: 
                             cuerpo = f.read()
                 except FileNotFoundError:
-                 cuerpo = f"<html><body><h1>{codigo}</h1></body></html>".encode()
+                    cuerpo = cuerpo = "<html><body><h1>{}</h1></body></html>".format(codigo).encode()
                 tamano = len(cuerpo)
                 tipo= "text/html"
-                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, None, False))
+                enviar_mensaje(cs, mensaje(codigo, tipo, tamano, fecha, None))
                 cs.send(cuerpo)
         else:
             cerrar_conexion(cs)
+            logger.info("Timeout\n")
             return None
             # Termino por TimeOut
 
 
-def mensaje(codigo, tipo, tamano, fecha, cookie, condicion):
+def mensaje(codigo, tipo, tamano, fecha, cookie):
     if codigo == "200":
-        if condicion:
-            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nSet-Cookie: cookie_counter_9448={cookie}; Max-Age=30\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+        if cookie is not None:
+            respuesta = "HTTP/1.1 200 OK\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {}\r\nSet-Cookie: cookie_counter_9448={}; Max-Age=30\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(fecha, TIMEOUT_CONNECTION, cookie, tamano, tipo)
         else:
-            respuesta = f"HTTP/1.1 200 OK\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {TIMEOUT_CONNECTION}\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+            respuesta = "HTTP/1.1 200 OK\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(fecha, TIMEOUT_CONNECTION, tamano, tipo)
     else:
-        respuesta = f"HTTP/1.1 {codigo}\r\nConnection: close\r\nDate: {fecha}\r\nServer: web.nombreorganizacion9448.org\r\nContent-Length: {tamano}\r\nContent-Type: {tipo}\r\n\r\n"
+        respuesta = "HTTP/1.1 {}\r\nConnection: close\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(codigo, fecha, tamano, tipo)
     return respuesta
 
 def process_host(headers):
@@ -252,6 +256,7 @@ def main():
             if pid == 0:
                 cerrar_conexion(cs)
                 process_web_request(conn, args.webroot)
+                os._exit(0)
             else:
                 cerrar_conexion(conn)
 
