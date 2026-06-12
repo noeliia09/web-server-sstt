@@ -115,7 +115,7 @@ def process_web_request(cs, webroot):
             data = recibir_mensaje(cs)
             if not data:
                 cerrar_conexion(cs)
-                logger.info("Cliente cerro la conexión.\n")
+                logger.info("Cerrando conexion...\n")
                 return None
             print(data) 
             data = data.split("\r\n")
@@ -194,11 +194,11 @@ def process_web_request(cs, webroot):
 def mensaje(codigo, tipo, tamano, fecha, cookie):
     if codigo == "200":
         if cookie is not None:
-            respuesta = "HTTP/1.1 200 OK\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {}\r\nSet-Cookie: cookie_counter_9448={}; Max-Age=30\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(fecha, TIMEOUT_CONNECTION, cookie, tamano, tipo)
+            respuesta = "HTTP/1.1 200 OK\r\nServer: web.nombreorganizacion9448.org\r\nContent-Type: {}\r\nContent-Length: {}\r\nDate: {}\r\nConnection: keep-alive\r\nKeep-Alive: timeout={}\r\nSet-Cookie: cookie_counter_9448={}; Max-Age=30\r\n\r\n".format(tipo, tamano, fecha, TIMEOUT_CONNECTION, cookie)
         else:
-            respuesta = "HTTP/1.1 200 OK\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nConnection: keep-alive\r\nKeep-Alive: {}\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(fecha, TIMEOUT_CONNECTION, tamano, tipo)
+            respuesta = "HTTP/1.1 200 OK\r\nServer: web.nombreorganizacion9448.org\r\nContent-Type: {}\r\nContent-Length: {}\r\nDate: {}\r\nConnection: keep-alive\r\nKeep-Alive: timeout={}\r\n\r\n".format(tipo, tamano, fecha, TIMEOUT_CONNECTION)
     else:
-        respuesta = "HTTP/1.1 {}\r\nConnection: close\r\nDate: {}\r\nServer: web.nombreorganizacion9448.org\r\nContent-Length: {}\r\nContent-Type: {}\r\n\r\n".format(codigo, fecha, tamano, tipo)
+        respuesta = "HTTP/1.1 {}\r\nServer: web.nombreorganizacion9448.org\r\nContent-Type: {}\r\nContent-Length: {}\r\nDate: {}\r\nConnection: close\r\n\r\n".format(codigo, tipo, tamano, fecha)
     return respuesta
 
 def process_host(headers):
